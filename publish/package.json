@@ -1,26 +1,16 @@
 {
-    "name": "publish-plugin",
+    "name": "@wonderlandengine/publish-plugin",
     "version": "0.0.1",
-    "description": "Publish Plugin",
-    "main": "js/index.js",
+    "description": "Wonderland Editor plugin to publish an application to the Wonderland Cloud",
+    "main": "index.mjs",
     "type": "module",
-    "module": "js/index.js",
-    "scripts": {
-        "build": "echo \"The 'build' script is run by the editor and should produce your application bundle\"",
-        "watch": "tsc -w"
-    },
+    "module": "index.mjs",
     "keywords": [
         "wonderland-engine"
     ],
-    "devDependencies": {
-        "typescript": "^5.5.2"
-    },
     "dependencies": {
         "@wonderlandcloud/cli": "^0.1.4",
-        "@wonderlandengine/api": "file:../../Tools/Wonderland Nightly/js/api/wonderlandengine-api.tgz",
-        "@wonderlandengine/components": "^1.0.7",
         "@wonderlandengine/editor-api": "^1.2.0-dev.3",
-        "gl-matrix": "^3.4.3",
         "open": "^10.1.0"
     }
 }
