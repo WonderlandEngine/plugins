@@ -7,7 +7,7 @@
         "plugins",
         "editor"
     ],
-    "workspaces": [ "publish-plugin" ],
+    "workspaces": [ "packages/publish-plugin" ],
     "prettier": "@wonderlandengine/prettier-config",
     "scripts": {
         "pretty": "prettier --write \"publish/**/*.mjs\""
