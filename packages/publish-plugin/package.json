@@ -1,0 +1,17 @@
+{
+    "name": "@wonderlandengine/publish-plugin",
+    "version": "0.0.1",
+    "description": "Wonderland Editor plugin to publish an application to the Wonderland Cloud",
+    "main": "index.mjs",
+    "typings": "index.d.ts",
+    "type": "module",
+    "module": "index.mjs",
+    "keywords": [
+        "wonderland-engine"
+    ],
+    "dependencies": {
+        "@wonderlandcloud/cli": "^0.1.4",
+        "@wonderlandengine/editor-api": "^1.2.0-dev.3",
+        "open": "^10.1.0"
+    }
+}

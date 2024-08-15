@@ -1,6 +1,7 @@
-import { EditorPlugin, ui, tools, data, project, } from '@wonderlandengine/editor-api';
-import { CloudClient } from '@wonderlandcloud/cli';
+import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
+import {CloudClient} from '@wonderlandcloud/cli';
 import open from 'open';
+
 export default class PublishPlugin extends EditorPlugin {
     token = '';
     publishedUrl = '';
@@ -25,8 +26,7 @@ export default class PublishPlugin extends EditorPlugin {
         // Validate the cleaned string against the regex pattern
         if (regex.test(cleanedString)) {
             return cleanedString;
-        }
-        else {
+        } else {
             console.error(`Failed to clean project name: ${input}`);
             return null; // Return null if the string does not comply
         }
@@ -47,8 +47,7 @@ export default class PublishPlugin extends EditorPlugin {
                     try {
                         const result = await this.publish(cleanName);
                         this.error = '';
-                    }
-                    catch (e) {
+                    } catch (e) {
                         console.error(e);
                         this.error = e;
                     }
@@ -61,53 +60,52 @@ export default class PublishPlugin extends EditorPlugin {
             ui.label(`Published at: ${this.publishedUrl}`);
             ui.separator();
             if (ui.button('Open')) {
-                open(`https://${this.publishedUrl}`).then(() => { }).catch((e) => { });
-            };
+                open(`https://${this.publishedUrl}`)
+                    .then(() => {})
+                    .catch((e) => {});
+            }
         }
 
         if (this.error) {
-            ui.separator(); ui.separator();
+            ui.separator();
+            ui.separator();
             ui.label(`Failed to publish: ${this.error}`);
         }
     }
 
     /**
-  * Publishes the project to the cloud
-  * @param {string} projectName
-  * @returns {ProjectInfo } Project info
-  */
+     * Publishes the project to the cloud
+     * @param {string} projectName
+     * @returns {ProjectInfo } Project info
+     */
     async publish(projectName) {
-
-
         const api = new Api();
         const action = await api.createToken();
         console.log(`created action token: ${action.id}`);
 
-        if (!this.token || !await this.validateAuthToken(this.token)) {
+        if (!this.token || !(await this.validateAuthToken(this.token))) {
             await open(`https://wonderlandengine.com/account/?actionId=${action.id}`);
             const result = await api.pollActionResult();
 
             this.token = result;
         }
 
-        // const pages = await cloudClient.page.list();
-        //console.log(pages);
         const cloudClient = new CloudClient({
-            WLE_CREDENTIALS: this.token,//result,
+            WLE_CREDENTIALS: this.token, //result,
             WORK_DIR: project.root,
             COMMANDER_URL: 'https://cloud.wonderland.dev',
         });
 
-        // if (!check) {
-        //     console.error('Failed to validate auth token');
-        //     throw new Error('Failed to validate auth token');
-        // }
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
             console.log(page);
             if (page) {
-                const updateProjectResponse =
-                    await cloudClient.page.update(project.deployPath, this.projectName, true, true);
+                const updateProjectResponse = await cloudClient.page.update(
+                    project.deployPath,
+                    this.projectName,
+                    true,
+                    true
+                );
 
                 this.publishedUrl = updateProjectResponse.projectDomain;
                 this.projectName = updateProjectResponse.projectName;
@@ -116,8 +114,12 @@ export default class PublishPlugin extends EditorPlugin {
             }
         }
 
-        const updateProjectResponse =
-            await cloudClient.page.create(project.deployPath, projectName, true, true);
+        const updateProjectResponse = await cloudClient.page.create(
+            project.deployPath,
+            projectName,
+            true,
+            true
+        );
         console.log(updateProjectResponse);
 
         this.publishedUrl = updateProjectResponse.projectDomain;
@@ -167,10 +169,14 @@ class Api {
             body: raw,
             redirect: 'follow',
         };
-        return new Action(await fetch(API_URL + '/auth/action', requestOptions).then((response) => response.text().then((data) => {
-            this.tokenId = data;
-            return data;
-        })));
+        return new Action(
+            await fetch(API_URL + '/auth/action', requestOptions).then((response) =>
+                response.text().then((data) => {
+                    this.tokenId = data;
+                    return data;
+                })
+            )
+        );
     }
     async pollActionResult() {
         // get action result, once the result exists, we will delete the action
@@ -188,7 +194,10 @@ class Api {
                 let i;
                 i = setInterval(async () => {
                     /* Poll access token */
-                    const res = await fetch(API_URL + `/auth/action/${this.tokenId}/result`, requestOptions).then((response) => response.json());
+                    const res = await fetch(
+                        API_URL + `/auth/action/${this.tokenId}/result`,
+                        requestOptions
+                    ).then((response) => response.json());
                     console.log(`polling: ${counter++}`);
                     console.log(res);
                     // GET /auth/action/id
@@ -198,8 +207,7 @@ class Api {
                         resolve(res.token);
                     }
                 }, POLLING_INTERVAL);
-            }
-            catch (e) {
+            } catch (e) {
                 reject(e);
             }
         });
