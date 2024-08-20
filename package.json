@@ -10,7 +10,7 @@
     "workspaces": [ "packages/publish-plugin" ],
     "prettier": "@wonderlandengine/prettier-config",
     "scripts": {
-        "pretty": "prettier --write \"publish/**/*.mjs\""
+        "pretty": "prettier --write \"packages/**/*.mjs\""
     },
     "devDependencies": {
         "@wonderlandengine/prettier-config": "^1.0.0",
