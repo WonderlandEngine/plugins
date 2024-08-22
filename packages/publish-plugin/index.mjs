@@ -1,6 +1,5 @@
 import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
-import open from 'open';
 
 export default class PublishPlugin extends EditorPlugin {
     token = '';
@@ -60,9 +59,7 @@ export default class PublishPlugin extends EditorPlugin {
             ui.label(`Published at: ${this.publishedUrl}`);
             ui.separator();
             if (ui.button('Open')) {
-                open(`https://${this.publishedUrl}`)
-                    .then(() => {})
-                    .catch((e) => {});
+                tools.openBrowser(`https://${this.publishedUrl}`);
             }
         }
 
@@ -84,7 +81,9 @@ export default class PublishPlugin extends EditorPlugin {
         console.log(`created action token: ${action.id}`);
 
         if (!this.token || !(await this.validateAuthToken(this.token))) {
-            await open(`https://wonderlandengine.com/account/?actionId=${action.id}`);
+            tools.openBrowser(
+                `https://wonderlandengine.com/account/?actionId=${action.id}`
+            );
             const result = await api.pollActionResult();
 
             this.token = result;
