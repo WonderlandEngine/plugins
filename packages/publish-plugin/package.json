@@ -11,6 +11,6 @@
     ],
     "dependencies": {
         "@wonderlandcloud/cli": "^0.1.4",
-        "@wonderlandengine/editor-api": "^1.2.0-dev.3"
+        "@wonderlandengine/editor-api": "^1.2.3-dev.1"
     }
 }
