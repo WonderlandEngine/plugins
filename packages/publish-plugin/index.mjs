@@ -1,6 +1,16 @@
 import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
 
+const STATE_NONE = 0;
+const STATE_CONFIRMING = 1;
+const STATE_UPLOADING = 2;
+
+const API_URL = 'https://api.wonderlandengine.com';
+/* Check action confirmation every 5 seconds */
+const POLLING_INTERVAL = 5000;
+/* Timeout action confirmation in 60 seconds */
+const TIMEOUT_INTERVALS = (60 * 1000) / POLLING_INTERVAL;
+
 export default class PublishPlugin extends EditorPlugin {
     token = '';
     publishedUrl = '';
@@ -13,6 +23,9 @@ export default class PublishPlugin extends EditorPlugin {
     constructor() {
         super();
         this.name = 'Wonderland Cloud - Publish';
+        this.state = STATE_NONE;
+        this.cancelled = false;
+        this.listed = false;
     }
 
     correctProjectName(input) {
@@ -25,39 +38,49 @@ export default class PublishPlugin extends EditorPlugin {
         // Validate the cleaned string against the regex pattern
         if (regex.test(cleanedString)) {
             return cleanedString;
-        } else {
-            console.error(`Failed to clean project name: ${input}`);
-            return null; // Return null if the string does not comply
         }
+        return null; // Return null if the string does not comply
     }
     /* Use this function for drawing UI */
     draw() {
-        ui.label(`project name: ${data.settings.project.name}`);
+        ui.text(`Publish "${data.settings.project.name}"`);
         ui.separator();
-        ui.label(`Working Directory: ${project.root}`);
-        ui.separator();
-        ui.label(`Deploy Directory: ${project.deployPath}`);
-        ui.separator();
-        if (ui.button('Upload')) {
+
+        this.listed = ui.checkbox('Publicly listed', this.listed) ?? this.listed;
+
+        if (this.state === STATE_NONE && ui.button('Publish to Wonderland Pages')) {
             this.error = '';
             const cleanName = this.correctProjectName(data.settings.project.name);
             if (cleanName) {
-                tools.packageProject().then(async () => {
-                    try {
-                        const result = await this.publish(cleanName);
-                        this.error = '';
-                    } catch (e) {
-                        console.error(e);
-                        this.error = e;
-                    }
-                });
+                this.uploading = STATE_CONFIRMING;
+                this.cancelled = false;
+                tools
+                    .packageProject()
+                    .then(async () => {
+                        try {
+                            const result = await this.publish(cleanName);
+                            this.error = '';
+                        } catch (e) {
+                            console.error(e);
+                            this.error = e;
+                        }
+                    })
+                    .finally(() => (this.state = STATE_NONE));
+            } else {
+                this.error = 'Unable to create a slug from the project name';
             }
+        } else if (this.state === STATE_CONFIRMING) {
+            ui.text('Confirm in your browser.');
+            if (ui.button('Cancel')) {
+                this.cancelled = true;
+            }
+        } else if (this.state === STATE_UPLOADING) {
+            ui.text('Uploading deployment.');
         }
-        ui.separator();
+
         if (this.publishedUrl) {
             ui.separator();
-            ui.label(`Published at: ${this.publishedUrl}`);
-            ui.separator();
+            ui.text(`Published at: ${this.publishedUrl}`);
             if (ui.button('Open')) {
                 tools.openBrowser(`https://${this.publishedUrl}`);
             }
@@ -65,45 +88,43 @@ export default class PublishPlugin extends EditorPlugin {
 
         if (this.error) {
             ui.separator();
-            ui.separator();
-            ui.label(`Failed to publish: ${this.error}`);
+            ui.text(`Failed to publish: ${this.error}`);
         }
     }
 
     /**
      * Publishes the project to the cloud
-     * @param {string} projectName
+     * @param {string} projectSlug Slug of the project name to publish to
      * @returns {ProjectInfo } Project info
      */
-    async publish(projectName) {
-        const api = new Api();
-        const action = await api.createToken();
-        console.log(`created action token: ${action.id}`);
-
+    async publish(projectSlug) {
+        const actionId = await this.createToken();
         if (!this.token || !(await this.validateAuthToken(this.token))) {
-            tools.openBrowser(
-                `https://wonderlandengine.com/account/?actionId=${action.id}`
-            );
-            const result = await api.pollActionResult();
+            tools.openBrowser(`https://wonderlandengine.com/account/?actionId=${actionId}`);
+            const result = await this.pollActionResult();
 
             this.token = result;
         }
 
+        if (this.cancelled) return null;
+
+        this.state = STATE_UPLOADING;
+
         const cloudClient = new CloudClient({
-            WLE_CREDENTIALS: this.token, //result,
+            WLE_CREDENTIALS: this.token,
             WORK_DIR: project.root,
             COMMANDER_URL: 'https://cloud.wonderland.dev',
         });
 
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
-            console.log(page);
             if (page) {
                 const updateProjectResponse = await cloudClient.page.update(
                     project.deployPath,
                     this.projectName,
-                    true,
-                    true
+                    this.public,
+                    /* Use threads only if the server settings match */
+                    data.settings.editor.serverCOEP === 'require-corp'
                 );
 
                 this.publishedUrl = updateProjectResponse.projectDomain;
@@ -115,11 +136,10 @@ export default class PublishPlugin extends EditorPlugin {
 
         const updateProjectResponse = await cloudClient.page.create(
             project.deployPath,
-            projectName,
+            projectSlug,
             true,
             true
         );
-        console.log(updateProjectResponse);
 
         this.publishedUrl = updateProjectResponse.projectDomain;
         this.projectName = updateProjectResponse.projectName;
@@ -132,25 +152,12 @@ export default class PublishPlugin extends EditorPlugin {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: authToken,
-                'User-Agent': 'WonderlandEditor/1.2.2',
+                'User-Agent': 'WonderlandEditor/1.2.3',
             },
         });
-        if (response.status === 200) {
-            return true;
-        } else {
-            return false;
-        }
+        return response.status === 200;
     }
-}
-const API_URL = 'https://api.wonderlandengine.com';
-const POLLING_INTERVAL = 5000;
-class Action {
-    id = '';
-    constructor(id) {
-        this.id = id;
-    }
-}
-class Api {
+
     tokenId = undefined;
     async createToken() {
         const raw = JSON.stringify({
@@ -162,21 +169,20 @@ class Api {
         const requestOptions = {
             method: 'POST',
             headers: {
-                'User-Agent': 'WonderlandEditor/1.2.2',
+                'User-Agent': 'WonderlandEditor/1.2.3',
                 'Content-Type': 'application/json',
             },
             body: raw,
             redirect: 'follow',
         };
-        return new Action(
-            await fetch(API_URL + '/auth/action', requestOptions).then((response) =>
-                response.text().then((data) => {
-                    this.tokenId = data;
-                    return data;
-                })
-            )
-        );
+        return await fetch(API_URL + '/auth/action', requestOptions)
+            .then((response) => response.text())
+            .then((data) => {
+                this.tokenId = data;
+                return data;
+            });
     }
+
     async pollActionResult() {
         // get action result, once the result exists, we will delete the action
         const requestOptions = {
@@ -187,6 +193,7 @@ class Api {
             },
             redirect: 'follow',
         };
+
         let counter = 0;
         return new Promise(async (resolve, reject) => {
             try {
@@ -197,8 +204,12 @@ class Api {
                         API_URL + `/auth/action/${this.tokenId}/result`,
                         requestOptions
                     ).then((response) => response.json());
-                    console.log(`polling: ${counter++}`);
-                    console.log(res);
+
+                    if (counter > TIMEOUT_INTERVALS || this.cancelled) {
+                        clearInterval(i);
+                        reject();
+                    }
+
                     // GET /auth/action/id
                     if (!!res.token) {
                         clearInterval(i);
