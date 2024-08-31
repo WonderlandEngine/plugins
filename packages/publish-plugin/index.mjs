@@ -116,15 +116,17 @@ export default class PublishPlugin extends EditorPlugin {
             COMMANDER_URL: 'https://cloud.wonderland.dev',
         });
 
+        /* Use threads only if the server settings match */
+        const useThreads = data.settings.editor.serverCOEP === 'require-corp';
+
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
             if (page) {
                 const updateProjectResponse = await cloudClient.page.update(
                     project.deployPath,
                     this.projectName,
-                    this.public,
-                    /* Use threads only if the server settings match */
-                    data.settings.editor.serverCOEP === 'require-corp'
+                    this.listed,
+                    useThreads
                 );
 
                 this.publishedUrl = updateProjectResponse.projectDomain;
@@ -137,8 +139,8 @@ export default class PublishPlugin extends EditorPlugin {
         const updateProjectResponse = await cloudClient.page.create(
             project.deployPath,
             projectSlug,
-            true,
-            true
+            this.listed,
+            useThreads
         );
 
         this.publishedUrl = updateProjectResponse.projectDomain;
