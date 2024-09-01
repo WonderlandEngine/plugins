@@ -109,18 +109,10 @@ export default class PublishPlugin extends EditorPlugin {
                 this.error = '';
                 const slug = this.projectName ?? this.slugify(data.settings.project.name);
                 if (slug) {
-                    this.uploading = STATE_CONFIRMING;
-                    this.cancelled = false;
-                    tools
-                        .packageProject()
-                        .then(async () => {
-                            try {
-                                await this.publish(slug);
-                                this.error = '';
-                            } catch (e) {
-                                console.error(e);
-                                this.error = e;
-                            }
+                    this.publish(slug)
+                        .catch((e) => {
+                            console.error(e);
+                            this.error = e;
                         })
                         .finally(
                             () =>
@@ -168,6 +160,10 @@ export default class PublishPlugin extends EditorPlugin {
      * @returns {ProjectInfo } Project info
      */
     async publish(projectSlug) {
+        this.state = STATE_CONFIRMING;
+
+        this.cancelled = false;
+        await tools.packageProject();
         const actionId = await this.createToken();
 
         tools.openBrowser(`https://wonderlandengine.com/account/?actionId=${actionId}`);
