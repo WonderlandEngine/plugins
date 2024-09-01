@@ -1,9 +1,15 @@
 import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
+import {readFileSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+
+const v = data.settings.project.version;
+const VERSION = `${v[0]}.${v[1]}.${v[2]}${v[3] ? '-rc' + v[3] : ''}`;
 
 const STATE_NONE = 0;
 const STATE_CONFIRMING = 1;
 const STATE_UPLOADING = 2;
+const STATE_PUBLISHED = 3;
 
 const API_URL = 'https://api.wonderlandengine.com';
 /* Check action confirmation every 5 seconds */
@@ -11,24 +17,72 @@ const POLLING_INTERVAL = 5000;
 /* Timeout action confirmation in 60 seconds */
 const TIMEOUT_INTERVALS = (60 * 1000) / POLLING_INTERVAL;
 
+const loadDeploymentConfig = () => {
+    const contents = readFileSync(join(project.root, 'deployment.json'), {
+        encoding: 'utf8',
+    });
+    if (!contents) return null;
+    console.log('[publish-plugin] Loaded config from deployment.json');
+    return JSON.parse(contents);
+};
+const saveDeploymentConfig = (uploadProjectResponse) => {
+    writeFileSync(
+        join(project.root, 'deployment.json'),
+        JSON.stringify({
+            projectLocation: project.root,
+            projectName: uploadProjectResponse.projectName,
+            projectDomain: uploadProjectResponse.projectDomain,
+            accessType: uploadProjectResponse.accessType,
+            withThreads: uploadProjectResponse.withThreads,
+        })
+    );
+};
+
 export default class PublishPlugin extends EditorPlugin {
-    token = '';
-    publishedUrl = '';
-    projectName = '';
+    name = 'Wonderland Cloud - Publish';
+
+    projectDomain = null;
+    projectName = null;
     publiser;
+
+    state = STATE_NONE;
+    cancelled = false;
+    listed = true;
 
     error = '';
 
     /* The constructor is called when your plugin is loaded */
     constructor() {
         super();
-        this.name = 'Wonderland Cloud - Publish';
-        this.state = STATE_NONE;
-        this.cancelled = false;
-        this.listed = false;
     }
 
-    correctProjectName(input) {
+    reset() {
+        this.projectDomain = null;
+        this.projectName = null;
+        this.publiser;
+
+        this.state = STATE_NONE;
+        this.cancelled = false;
+        this.listed = true;
+
+        this.error = '';
+    }
+
+    postProjectLoad() {
+        this.reset();
+
+        const config = loadDeploymentConfig();
+        if (config) {
+            this.listed = config.accessType === 'public';
+            this.projectName = config.projectName;
+            this.projectDomain = config.projectDomain;
+            this.state = STATE_PUBLISHED;
+        }
+
+        return true;
+    }
+
+    slugify(input) {
         // Convert the input string to lowercase
         let lowercaseString = input.toLowerCase();
         // Remove all characters except lowercase alphabets, digits, and dashes
@@ -46,28 +100,37 @@ export default class PublishPlugin extends EditorPlugin {
         ui.text(`Publish "${data.settings.project.name}"`);
         ui.separator();
 
-        this.listed = ui.checkbox('Publicly listed', this.listed) ?? this.listed;
+        if (this.state === STATE_NONE || this.state === STATE_PUBLISHED) {
+            this.listed = ui.checkbox('Publicly listed', this.listed) ?? this.listed;
 
-        if (this.state === STATE_NONE && ui.button('Publish to Wonderland Pages')) {
-            this.error = '';
-            const cleanName = this.correctProjectName(data.settings.project.name);
-            if (cleanName) {
-                this.uploading = STATE_CONFIRMING;
-                this.cancelled = false;
-                tools
-                    .packageProject()
-                    .then(async () => {
-                        try {
-                            const result = await this.publish(cleanName);
-                            this.error = '';
-                        } catch (e) {
-                            console.error(e);
-                            this.error = e;
-                        }
-                    })
-                    .finally(() => (this.state = STATE_NONE));
-            } else {
-                this.error = 'Unable to create a slug from the project name';
+            const label =
+                this.state === STATE_NONE ? 'Publish to Wonderland Pages' : 'Update';
+            if (ui.button(label)) {
+                this.error = '';
+                const slug = this.projectName ?? this.slugify(data.settings.project.name);
+                if (slug) {
+                    this.uploading = STATE_CONFIRMING;
+                    this.cancelled = false;
+                    tools
+                        .packageProject()
+                        .then(async () => {
+                            try {
+                                await this.publish(slug);
+                                this.error = '';
+                            } catch (e) {
+                                console.error(e);
+                                this.error = e;
+                            }
+                        })
+                        .finally(
+                            () =>
+                                (this.state = !!this.projectName
+                                    ? STATE_PUBLISHED
+                                    : STATE_NONE)
+                        );
+                } else {
+                    this.error = 'Unable to create a slug from the project name';
+                }
             }
         } else if (this.state === STATE_CONFIRMING) {
             ui.text('Confirm in your browser.');
@@ -76,13 +139,20 @@ export default class PublishPlugin extends EditorPlugin {
             }
         } else if (this.state === STATE_UPLOADING) {
             ui.text('Uploading deployment.');
+            if (ui.spinner) ui.spinner();
         }
 
-        if (this.publishedUrl) {
-            ui.separator();
-            ui.text(`Published at: ${this.publishedUrl}`);
-            if (ui.button('Open')) {
-                tools.openBrowser(`https://${this.publishedUrl}`);
+        if (this.state === STATE_PUBLISHED) {
+            if (this.projectDomain) {
+                ui.separator();
+                ui.text(`Published at:\n${this.projectDomain}`);
+                if (ui.button('Open in Browser')) {
+                    tools.openBrowser(`https://${this.projectDomain}`);
+                }
+                ui.sameLine();
+                if (ui.button('Manage')) {
+                    tools.openBrowser(`https://cloud.wonderland.dev/pages`);
+                }
             }
         }
 
@@ -99,65 +169,53 @@ export default class PublishPlugin extends EditorPlugin {
      */
     async publish(projectSlug) {
         const actionId = await this.createToken();
-        if (!this.token || !(await this.validateAuthToken(this.token))) {
-            tools.openBrowser(`https://wonderlandengine.com/account/?actionId=${actionId}`);
-            const result = await this.pollActionResult();
 
-            this.token = result;
-        }
+        tools.openBrowser(`https://wonderlandengine.com/account/?actionId=${actionId}`);
+        const token = await this.pollActionResult();
 
-        if (this.cancelled) return null;
+        if (this.cancelled) return;
 
         this.state = STATE_UPLOADING;
 
-        const cloudClient = new CloudClient({
-            WLE_CREDENTIALS: this.token,
+        const config = {
+            WLE_CREDENTIALS: token,
             WORK_DIR: project.root,
             COMMANDER_URL: 'https://cloud.wonderland.dev',
-        });
+        };
+        const cloudClient = new CloudClient(config);
 
         /* Use threads only if the server settings match */
         const useThreads = data.settings.editor.serverCOEP === 'require-corp';
 
+        let updateProjectResponse = null;
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
             if (page) {
-                const updateProjectResponse = await cloudClient.page.update(
+                updateProjectResponse = await cloudClient.page.update(
                     project.deployPath,
                     this.projectName,
                     this.listed,
                     useThreads
                 );
-
-                this.publishedUrl = updateProjectResponse.projectDomain;
-                this.projectName = updateProjectResponse.projectName;
-
-                return updateProjectResponse;
             }
         }
 
-        const updateProjectResponse = await cloudClient.page.create(
-            project.deployPath,
-            projectSlug,
-            this.listed,
-            useThreads
-        );
+        /* Page did not exist */
+        if (!updateProjectResponse) {
+            updateProjectResponse = await cloudClient.page.create(
+                project.deployPath,
+                projectSlug,
+                this.listed,
+                useThreads
+            );
+        }
 
-        this.publishedUrl = updateProjectResponse.projectDomain;
+        this.projectDomain = updateProjectResponse.projectDomain;
         this.projectName = updateProjectResponse.projectName;
 
-        return updateProjectResponse;
-    }
+        saveDeploymentConfig(updateProjectResponse);
 
-    async validateAuthToken(authToken) {
-        const response = await fetch('https://api.wonderlandengine.com/user/me', {
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: authToken,
-                'User-Agent': 'WonderlandEditor/1.2.3',
-            },
-        });
-        return response.status === 200;
+        return;
     }
 
     tokenId = undefined;
@@ -165,13 +223,13 @@ export default class PublishPlugin extends EditorPlugin {
         const raw = JSON.stringify({
             action: 'createToken',
             parameters: {
-                projectName: 'TestProject',
+                projectName: data.settings.project.name,
             },
         });
         const requestOptions = {
             method: 'POST',
             headers: {
-                'User-Agent': 'WonderlandEditor/1.2.3',
+                'User-Agent': 'WonderlandEditor/' + VERSION,
                 'Content-Type': 'application/json',
             },
             body: raw,
@@ -190,8 +248,7 @@ export default class PublishPlugin extends EditorPlugin {
         const requestOptions = {
             method: 'GET',
             headers: {
-                // TODO it's node here, not the editor :thinking:
-                'User-Agent': 'WonderlandEditor/version',
+                'User-Agent': 'WonderlandEditor/' + VERSION,
             },
             redirect: 'follow',
         };
@@ -207,15 +264,19 @@ export default class PublishPlugin extends EditorPlugin {
                         requestOptions
                     ).then((response) => response.json());
 
-                    if (counter > TIMEOUT_INTERVALS || this.cancelled) {
+                    if (counter > TIMEOUT_INTERVALS) {
                         clearInterval(i);
-                        reject();
+                        reject('Action timed out.');
+                        return;
+                    }
+                    if (this.cancelled) {
+                        clearInterval(i);
+                        reject('Action cancelled.');
+                        return;
                     }
 
-                    // GET /auth/action/id
                     if (!!res.token) {
                         clearInterval(i);
-                        /* display success.result or something like that in the ui */
                         resolve(res.token);
                     }
                 }, POLLING_INTERVAL);
