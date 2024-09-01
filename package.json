@@ -7,7 +7,9 @@
         "plugins",
         "editor"
     ],
-    "workspaces": [ "packages/publish-plugin" ],
+    "workspaces": [
+        "packages/publish-plugin"
+    ],
     "prettier": "@wonderlandengine/prettier-config",
     "scripts": {
         "pretty": "prettier --write \"packages/**/*.mjs\""
@@ -15,5 +17,8 @@
     "devDependencies": {
         "@wonderlandengine/prettier-config": "^1.0.0",
         "prettier": "^3.3.3"
+    },
+    "dependencies": {
+        "@wonderlandengine/editor-api": "^1.2.3-dev.2"
     }
 }
