@@ -10,6 +10,7 @@
         "wonderland-engine"
     ],
     "scripts": {
+        "build": "esbuild index.ts --bundle --minify --platform=node --format=esm --target=es2022 --outfile=../../dist/cleanup-plugin.mjs",
         "tsc": "tsc --noEmit"
     },
     "prettier": "@wonderlandengine/prettier-config",

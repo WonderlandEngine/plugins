@@ -8,7 +8,8 @@
         "editor"
     ],
     "workspaces": [
-        "packages/publish-plugin"
+        "packages/publish-plugin",
+        "packages/cleanup-plugin"
     ],
     "prettier": "@wonderlandengine/prettier-config",
     "scripts": {
@@ -19,6 +20,7 @@
         "prettier": "^3.3.3"
     },
     "dependencies": {
-        "@wonderlandengine/editor-api": "^1.2.3-dev.2"
+        "@wonderlandengine/editor-api": "^1.2.3-dev.2",
+        "esbuild": "^0.24.0"
     }
 }
