@@ -5,7 +5,6 @@ import {existsSync} from 'node:fs';
  * Plugin to cleanup resources with broken links.
  */
 export default class CleanupPlugin extends EditorPlugin {
-
     result: Record<string, string[]> = {};
 
     /* The constructor is called when your plugin is loaded */
@@ -19,7 +18,7 @@ export default class CleanupPlugin extends EditorPlugin {
         ui.text('Unused Resources');
         ui.separator();
 
-        if (!this.result) {
+        if (Object.keys(this.result).length == 0) {
             this.collectResources();
             return;
         }
