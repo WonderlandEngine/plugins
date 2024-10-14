@@ -1,7 +1,23 @@
 import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
 import {readFileSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, relative} from 'node:path';
+
+interface ProjectInfo {
+    fullProjectUrl: string;
+    projectDomain: string;
+    accessType: 'public' | 'private';
+    email: string;
+    projectName: string;
+    id: string;
+    ownedByMe: boolean;
+    starredCount: number;
+    starredByMe: boolean;
+    withThreads: boolean;
+    description: string;
+    image: string;
+    teams: string[];
+};
 
 const v = data.settings.project.version;
 const VERSION = `${v[0]}.${v[1]}.${v[2]}${v[3] ? '-rc' + v[3] : ''}`;
@@ -25,11 +41,11 @@ const loadDeploymentConfig = () => {
     console.log('[publish-plugin] Loaded config from deployment.json');
     return JSON.parse(contents);
 };
-const saveDeploymentConfig = (uploadProjectResponse) => {
+const saveDeploymentConfig = (uploadProjectResponse: ProjectInfo) => {
     writeFileSync(
         join(project.root, 'deployment.json'),
         JSON.stringify({
-            projectLocation: project.root,
+            projectLocation: relative(project.deployPath, project.root),
             projectName: uploadProjectResponse.projectName,
             projectDomain: uploadProjectResponse.projectDomain,
             accessType: uploadProjectResponse.accessType,
@@ -41,13 +57,14 @@ const saveDeploymentConfig = (uploadProjectResponse) => {
 export default class PublishPlugin extends EditorPlugin {
     name = 'Wonderland Cloud - Publish';
 
-    projectDomain = null;
-    projectName = null;
-    publiser;
+    projectDomain: string|null = null;
+    projectName: string|null = null;
 
     state = STATE_NONE;
     cancelled = false;
     listed = true;
+
+    tokenId?: string;
 
     error = '';
 
@@ -59,7 +76,6 @@ export default class PublishPlugin extends EditorPlugin {
     reset() {
         this.projectDomain = null;
         this.projectName = null;
-        this.publiser;
 
         this.state = STATE_NONE;
         this.cancelled = false;
@@ -82,7 +98,7 @@ export default class PublishPlugin extends EditorPlugin {
         return true;
     }
 
-    slugify(input) {
+    slugify(input: string) {
         // Convert the input string to lowercase
         let lowercaseString = input.toLowerCase();
         // Remove all characters except lowercase alphabets, digits, and dashes
@@ -156,10 +172,10 @@ export default class PublishPlugin extends EditorPlugin {
 
     /**
      * Publishes the project to the cloud
-     * @param {string} projectSlug Slug of the project name to publish to
-     * @returns {ProjectInfo } Project info
+     * @param projectSlug Slug of the project name to publish to
+     * @returns Project info
      */
-    async publish(projectSlug) {
+    async publish(projectSlug: string) {
         this.state = STATE_CONFIRMING;
 
         this.cancelled = false;
@@ -183,27 +199,27 @@ export default class PublishPlugin extends EditorPlugin {
         /* Use threads only if the server settings match */
         const useThreads = data.settings.editor.serverCOEP === 'require-corp';
 
-        let updateProjectResponse = null;
+        let updateProjectResponse: ProjectInfo|null = null;
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
             if (page) {
-                updateProjectResponse = await cloudClient.page.update(
+                updateProjectResponse = (await cloudClient.page.update(
                     project.deployPath,
                     this.projectName,
                     this.listed,
                     useThreads
-                );
+                )) as ProjectInfo;
             }
         }
 
         /* Page did not exist */
         if (!updateProjectResponse) {
-            updateProjectResponse = await cloudClient.page.create(
+            updateProjectResponse = (await cloudClient.page.create(
                 project.deployPath,
                 projectSlug,
                 this.listed,
                 useThreads
-            );
+            )) as ProjectInfo;
         }
 
         this.projectDomain = updateProjectResponse.projectDomain;
@@ -214,7 +230,6 @@ export default class PublishPlugin extends EditorPlugin {
         return;
     }
 
-    tokenId = undefined;
     async createToken() {
         const raw = JSON.stringify({
             action: 'createToken',
@@ -222,7 +237,7 @@ export default class PublishPlugin extends EditorPlugin {
                 projectName: data.settings.project.name,
             },
         });
-        const requestOptions = {
+        return await fetch(API_URL + '/auth/action', {
             method: 'POST',
             headers: {
                 'User-Agent': 'WonderlandEditor/' + VERSION,
@@ -230,34 +245,32 @@ export default class PublishPlugin extends EditorPlugin {
             },
             body: raw,
             redirect: 'follow',
-        };
-        return await fetch(API_URL + '/auth/action', requestOptions)
-            .then((response) => response.text())
-            .then((data) => {
-                this.tokenId = data;
-                return data;
-            });
+        })
+        .then((response) => response.text())
+        .then((data) => {
+            this.tokenId = data;
+            return data;
+        });
     }
 
     async pollActionResult() {
         // get action result, once the result exists, we will delete the action
-        const requestOptions = {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'WonderlandEditor/' + VERSION,
-            },
-            redirect: 'follow',
-        };
 
         let counter = 0;
         return new Promise(async (resolve, reject) => {
             try {
-                let i;
+                let i: number;
                 i = setInterval(async () => {
                     /* Poll access token */
                     const res = await fetch(
                         API_URL + `/auth/action/${this.tokenId}/result`,
-                        requestOptions
+                        {
+                            method: 'GET',
+                            headers: {
+                                'User-Agent': 'WonderlandEditor/' + VERSION,
+                            },
+                            redirect: 'follow',
+                        }
                     ).then((response) => response.json());
 
                     if (counter > TIMEOUT_INTERVALS) {
