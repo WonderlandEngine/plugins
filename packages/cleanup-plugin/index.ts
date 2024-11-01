@@ -1,5 +1,6 @@
-import {EditorPlugin, ui, data} from '@wonderlandengine/editor-api';
+import {EditorPlugin, project, ui, data} from '@wonderlandengine/editor-api';
 import {existsSync} from 'node:fs';
+import {cwd} from 'node:process';
 
 /**
  * Plugin to cleanup resources with broken links.
@@ -42,7 +43,8 @@ export default class CleanupPlugin extends EditorPlugin {
     /* Check whether the file linked by a resource exists, caching the result */
     linkExists(path: string) {
         if (!(path in this.LINK_CACHE)) {
-            this.LINK_CACHE[path] = existsSync(path);
+            /* Try as relative to project root first then unprefixed in case it's an absolute path */
+            this.LINK_CACHE[path] = existsSync(project.root + '/' + path) || existsSync(path);
         }
         return this.LINK_CACHE[path];
     }
