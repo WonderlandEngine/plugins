@@ -1,6 +1,5 @@
 import {EditorPlugin, project, ui, data} from '@wonderlandengine/editor-api';
 import {existsSync} from 'node:fs';
-import {cwd} from 'node:process';
 
 /**
  * Plugin to cleanup resources with broken links.
