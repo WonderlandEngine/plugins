@@ -7,7 +7,7 @@
     "type": "module",
     "module": "index.mjs",
     "scripts": {
-        "build": "esbuild index.mjs --bundle --minify --platform=node --format=esm --target=es2022 --outfile=../../dist/publish-plugin.mjs"
+        "build": "esbuild index.ts --bundle --minify --platform=node --format=esm --target=es2022 --outfile=../../dist/publish-plugin.mjs"
     },
     "keywords": [
         "wonderland-engine"
