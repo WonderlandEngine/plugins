@@ -1,6 +1,6 @@
 {
     "name": "@wonderlandengine/cleanup-plugin",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "Wonderland Editor plugin to cleanup resources in Wonderland Engine projects.",
     "main": "index.mjs",
     "typings": "index.d.ts",
@@ -16,7 +16,7 @@
     "prettier": "@wonderlandengine/prettier-config",
     "dependencies": {
         "@wonderlandcloud/cli": "^0.1.4",
-        "@wonderlandengine/editor-api": "^1.2.4"
+        "@wonderlandengine/editor-api": "^1.3.1"
     },
     "devDependencies": {
         "@wonderlandengine/prettier-config": "^1.0.0",
