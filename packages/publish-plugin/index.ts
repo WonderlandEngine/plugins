@@ -45,7 +45,7 @@ const saveDeploymentConfig = (uploadProjectResponse: ProjectInfo) => {
     writeFileSync(
         join(project.root, 'deployment.json'),
         JSON.stringify({
-            projectLocation: relative(project.deployPath, project.root),
+            projectLocation: relative(project.root, project.deployPath),
             projectName: uploadProjectResponse.projectName,
             projectDomain: uploadProjectResponse.projectDomain,
             accessType: uploadProjectResponse.accessType,
