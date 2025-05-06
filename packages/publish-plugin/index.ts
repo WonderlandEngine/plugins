@@ -1,6 +1,6 @@
 import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
-import {readFileSync, writeFileSync} from 'node:fs';
+import {readFileSync, writeFileSync, existsSync} from 'node:fs';
 import {join, relative} from 'node:path';
 
 interface ProjectInfo {
@@ -34,7 +34,9 @@ const POLLING_INTERVAL = 5000;
 const TIMEOUT_INTERVALS = (60 * 1000) / POLLING_INTERVAL;
 
 const loadDeploymentConfig = () => {
-    const contents = readFileSync(join(project.root, 'deployment.json'), {
+    const configPath = join(project.root, 'deployment.json');
+    if (!existsSync(configPath)) return null;
+    const contents = readFileSync(configPath, {
         encoding: 'utf8',
     });
     if (!contents) return null;
