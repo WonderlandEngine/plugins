@@ -17,7 +17,7 @@ interface ProjectInfo {
     description: string;
     image: string;
     teams: string[];
-};
+}
 
 const v = data.settings.project.version;
 const VERSION = `${v[0]}.${v[1]}.${v[2]}${v[3] ? '-rc' + v[3] : ''}`;
@@ -59,8 +59,8 @@ const saveDeploymentConfig = (uploadProjectResponse: ProjectInfo) => {
 export default class PublishPlugin extends EditorPlugin {
     name = 'Wonderland Cloud - Publish';
 
-    projectDomain: string|null = null;
-    projectName: string|null = null;
+    projectDomain: string | null = null;
+    projectName: string | null = null;
 
     state = STATE_NONE;
     cancelled = false;
@@ -201,7 +201,7 @@ export default class PublishPlugin extends EditorPlugin {
         /* Use threads only if the server settings match */
         const useThreads = data.settings.editor.serverCOEP === 'require-corp';
 
-        let updateProjectResponse: ProjectInfo|null = null;
+        let updateProjectResponse: ProjectInfo | null = null;
         if (!!this.projectName) {
             const page = await cloudClient.page.get(this.projectName);
             if (page) {
@@ -248,11 +248,11 @@ export default class PublishPlugin extends EditorPlugin {
             body: raw,
             redirect: 'follow',
         })
-        .then((response) => response.text())
-        .then((data) => {
-            this.tokenId = data;
-            return data;
-        });
+            .then((response) => response.text())
+            .then((data) => {
+                this.tokenId = data;
+                return data;
+            });
     }
 
     async pollActionResult() {

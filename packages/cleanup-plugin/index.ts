@@ -43,7 +43,8 @@ export default class CleanupPlugin extends EditorPlugin {
     linkExists(path: string) {
         if (!(path in this.LINK_CACHE)) {
             /* Try as relative to project root first then unprefixed in case it's an absolute path */
-            this.LINK_CACHE[path] = existsSync(project.root + '/' + path) || existsSync(path);
+            this.LINK_CACHE[path] =
+                existsSync(project.root + '/' + path) || existsSync(path);
         }
         return this.LINK_CACHE[path];
     }
