@@ -163,6 +163,7 @@ export default class PublishPlugin extends EditorPlugin {
                 if (ui.button('Manage')) {
                     tools.openBrowser(`https://cloud.wonderland.dev/pages`);
                 }
+                ui.text('Click "manage" to add a custom domain.');
             }
         }
 
