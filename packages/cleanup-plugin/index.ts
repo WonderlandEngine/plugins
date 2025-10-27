@@ -1,4 +1,4 @@
-import {EditorPlugin, project, ui, data} from '@wonderlandengine/editor-api';
+import {EditorPlugin, ui, data, workspace} from '@wonderlandengine/editor-api';
 import {existsSync} from 'node:fs';
 
 /**
@@ -44,7 +44,7 @@ export default class CleanupPlugin extends EditorPlugin {
         if (!(path in this.LINK_CACHE)) {
             /* Try as relative to project root first then unprefixed in case it's an absolute path */
             this.LINK_CACHE[path] =
-                existsSync(project.root + '/' + path) || existsSync(path);
+                existsSync(workspace.root + '/' + path) || existsSync(path);
         }
         return this.LINK_CACHE[path];
     }

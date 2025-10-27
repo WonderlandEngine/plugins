@@ -1,4 +1,4 @@
-import {EditorPlugin, ui, tools, data, project} from '@wonderlandengine/editor-api';
+import {EditorPlugin, ui, tools, data, workspace} from '@wonderlandengine/editor-api';
 import {CloudClient} from '@wonderlandcloud/cli';
 import {readFileSync, writeFileSync, existsSync} from 'node:fs';
 import {join, relative} from 'node:path';
@@ -34,7 +34,7 @@ const POLLING_INTERVAL = 5000;
 const TIMEOUT_INTERVALS = (60 * 1000) / POLLING_INTERVAL;
 
 const loadDeploymentConfig = () => {
-    const configPath = join(project.root, 'deployment.json');
+    const configPath = join(workspace.root, 'deployment.json');
     if (!existsSync(configPath)) return null;
     const contents = readFileSync(configPath, {
         encoding: 'utf8',
@@ -45,9 +45,9 @@ const loadDeploymentConfig = () => {
 };
 const saveDeploymentConfig = (uploadProjectResponse: ProjectInfo) => {
     writeFileSync(
-        join(project.root, 'deployment.json'),
+        join(workspace.root, 'deployment.json'),
         JSON.stringify({
-            projectLocation: relative(project.root, project.deployPath),
+            projectLocation: relative(workspace.root, workspace.deployPath),
             projectName: uploadProjectResponse.projectName,
             projectDomain: uploadProjectResponse.projectDomain,
             accessType: uploadProjectResponse.accessType,
@@ -194,7 +194,7 @@ export default class PublishPlugin extends EditorPlugin {
 
         const config = {
             WLE_CREDENTIALS: token,
-            WORK_DIR: project.root,
+            WORK_DIR: workspace.root,
             COMMANDER_URL: 'https://cloud.wonderland.dev',
         };
         const cloudClient = new CloudClient(config);
@@ -207,7 +207,7 @@ export default class PublishPlugin extends EditorPlugin {
             const page = await cloudClient.page.get(this.projectName);
             if (page) {
                 updateProjectResponse = (await cloudClient.page.update(
-                    project.deployPath,
+                    workspace.deployPath,
                     this.projectName,
                     this.listed,
                     useThreads
@@ -218,7 +218,7 @@ export default class PublishPlugin extends EditorPlugin {
         /* Page did not exist */
         if (!updateProjectResponse) {
             updateProjectResponse = (await cloudClient.page.create(
-                project.deployPath,
+                workspace.deployPath,
                 projectSlug,
                 this.listed,
                 useThreads
