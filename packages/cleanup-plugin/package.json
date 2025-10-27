@@ -16,7 +16,7 @@
     "prettier": "@wonderlandengine/prettier-config",
     "dependencies": {
         "@wonderlandcloud/cli": "^0.1.4",
-        "@wonderlandengine/editor-api": "^1.5.0-rc.3"
+        "@wonderlandengine/editor-api": "^1.5.0"
     },
     "devDependencies": {
         "@wonderlandengine/prettier-config": "^1.0.0",
