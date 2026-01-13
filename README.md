@@ -7,8 +7,9 @@
 
 # Wonderland Engine Plugins
 
-Wonderland Engine's official plugins.
+Wonderland Engine's official default plugins repository.
 
 ## Usage
 
 Plugins listed in this repository are automatically shipped with the editor. No installation is required.
+
